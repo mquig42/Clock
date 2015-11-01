@@ -13,6 +13,10 @@
 
 enum ClockMode {SET_HOUR, SET_MINUTE, RUN};
 
+//Timer calibration adjustment.
+//Enter a negative number if the clock runs too slow, or positive if it's too fast.
+const int timer_ofs = -41;
+
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 volatile uint32_t global_seconds = 0;
 bool select = false;
@@ -45,7 +49,7 @@ void configureTimer()
     TCNT1 = 0;
     TCCR1A = 0;
     TCCR1B = 0;
-    OCR1A = 62499;
+    OCR1A = 62499 + timer_ofs;
     TCCR1B |= (1 << WGM12);
     TCCR1B |= (1 << CS12);
     TIMSK1 |= (1 << OCIE1A);
