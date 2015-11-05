@@ -9,29 +9,15 @@
  ******************************************************************************/
 
 #include <LiquidCrystal.h>
-#include <util/atomic.h>
+#include <QClock.h>
 
 enum ClockMode {SET_HOUR, SET_MINUTE, RUN};
 
-//Timer calibration adjustment.
-//Enter a negative number if the clock runs too slow, or positive if it's too fast.
-const int timer_ofs = -41;
-
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-volatile uint32_t global_seconds = 0;
 bool select = false;
 bool set = false;
 
-//Timer interrupt is fired once per second.
-//Increment seconds counter, toggle pin 13 LED, reset to 0 at midnight.
-ISR(TIMER1_COMPA_vect)
-{
-    global_seconds++;
-    digitalWrite(13, !digitalRead(13));
-    //Reset to 0 after 24 hours
-    if(global_seconds >= 86400)
-        global_seconds = 0;
-}
+
 
 void setup()
 {
@@ -39,21 +25,8 @@ void setup()
     pinMode(9, INPUT_PULLUP);
     pinMode(10, INPUT_PULLUP);
     pinMode(13, OUTPUT);
+    digitalWrite(13, 0);
     configureTimer();
-}
-
-//Configure timer1 to fire an interrupt once every second
-void configureTimer()
-{
-    noInterrupts();
-    TCNT1 = 0;
-    TCCR1A = 0;
-    TCCR1B = 0;
-    OCR1A = 62499 + timer_ofs;
-    TCCR1B |= (1 << WGM12);
-    TCCR1B |= (1 << CS12);
-    TIMSK1 |= (1 << OCIE1A);
-    interrupts();
 }
 
 void loop()
@@ -84,15 +57,8 @@ void readButtons()
     uint8_t select_c = !digitalRead(9);
     uint8_t set_c = !digitalRead(10);
 
-    if(!select_p && select_c)
-        select = true;
-    else
-        select = false;
-    
-    if(!set_p && set_c)
-        set = true;
-    else
-        set = false;
+    select = (!select_p && select_c);
+    set = (!set_p && set_c);
 
     select_p = select_c;
     set_p = set_c;
@@ -105,11 +71,10 @@ uint8_t checkSelectButton()
 {
     readButtons();
     
-    //We're using a pullup, so buttons are 0 when pressed
     if(select)
     {
-        //Disable timer interrupt to pause clock when setting
-        TIMSK1 &= ~(1 << OCIE1A);
+        //Stop the timer while setting
+        stopTimer();
         resetSeconds();
         return SET_HOUR;
     }
@@ -126,13 +91,8 @@ uint8_t setHour()
     if(select)
         return SET_MINUTE;
     if(set)
-    {
-        global_seconds += 3600;
-        
-        //wrap hours at midnight
-        if(global_seconds >= 86400)
-            global_seconds -= 86400;
-    }
+        incHour();
+    
     return SET_HOUR;
 }
 
@@ -146,34 +106,25 @@ uint8_t setMinute()
     if(select)
     {
         //Finished setting clock, so turn timer interrupt back on
-        TIMSK1 |= (1 << OCIE1A);
+        startTimer();
         //Timer interrupts may be queued, causing the clock to skip ahead
         //by a couple of seconds. Reset again to prevent this.
         resetSeconds();
         return RUN;
     }
     if(set)
-    {
-        global_seconds += 60;
+        incMinute();
 
-        //wrap minutes
-        if((global_seconds % 3600) / 60 == 0)
-            global_seconds -= 3600;
-    }
     return SET_MINUTE;
 }
 
 //Display time on the first line of the LCD in HH:MM:SS format
 void dispTime()
 {
-    uint32_t local_seconds;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-        local_seconds = global_seconds;
-    }
-    uint8_t hours = local_seconds / 3600;
-    uint8_t minutes = (local_seconds % 3600) / 60;
-    uint8_t secs = local_seconds % 60;
+    copySeconds();
+    uint8_t hours = getHour();
+    uint8_t minutes = getMinute();
+    uint8_t secs = getSecond();
     
     //Print time in HH:MM:SS format
     lcd.setCursor(0, 0);
@@ -189,14 +140,3 @@ void dispTime()
         lcd.print("0");
     lcd.print(secs);
 }
-
-//Resets the seconds portion of the current time to 0, while preserving hours and minutes.
-void resetSeconds()
-{
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-        uint8_t secs = global_seconds % 60;
-        global_seconds -= secs;
-    }
-}
-
