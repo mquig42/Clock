@@ -3,9 +3,15 @@
  * 2015.10.24
  * Mike Quigley
  * 
- * Test for binary LED clock. LEDs are connected to pins 8 through 13. 
- * The select and set buttons for the clock are connected to digital pins
- * 6 and 7 using internal pullup resistors.
+ * Binary clock using 5x7 LED matrix. Matrix is connected to I/O ports B and D
+ * (Binary pins 1 -> 12). Pin 0 is not used because a resistor on the Arduino
+ * board interferes and makes the lights dim, so values in port D must be
+ * shifted accordingly.
+ * 
+ * Select and Set buttons are connected to analog pins 1 and 0,
+ * aka digital pins 15 and 14, using internal pullup resistors.
+ * Pressing Set button when clock is running switches between binary
+ * and BCD output modes.
  ******************************************************************************/
 
 #include <QClock.h>
@@ -14,19 +20,19 @@ enum ClockMode {SET_HOUR, SET_MINUTE, RUN};
 
 bool select = false;
 bool set = false;
+bool bcd = false;
 
 
 
 void setup()
 {
-    pinMode(6,  INPUT_PULLUP);
-    pinMode(7,  INPUT_PULLUP);
-    pinMode(8,  OUTPUT);
-    pinMode(9,  OUTPUT);
-    pinMode(10, OUTPUT);
-    pinMode(11, OUTPUT);
-    pinMode(12, OUTPUT);
-    pinMode(13, OUTPUT);
+    for(unsigned char i = 1; i<13; i++)
+    {
+        pinMode(i, OUTPUT);
+    }
+    pinMode(14, INPUT_PULLUP);
+    pinMode(15, INPUT_PULLUP);
+    pinMode(16, INPUT_PULLUP);
     configureTimer();
 }
 
@@ -43,9 +49,12 @@ void loop()
             m = (ClockMode)setMinute();
             break;
         case RUN:
-            m = (ClockMode)checkSelectButton();
+            m = (ClockMode)runState();
     }
-    dispTime();
+    if(bcd)
+        dispBcdTime();
+    else
+        dispBinaryTime();
 }
 
 //Reads the current state of both buttons, and sets the global variables accordingly
@@ -55,8 +64,8 @@ void readButtons()
 {
     static uint8_t select_p = false;
     static uint8_t set_p = false;
-    uint8_t select_c = !digitalRead(6);
-    uint8_t set_c = !digitalRead(7);
+    uint8_t select_c = digitalRead(15);
+    uint8_t set_c = digitalRead(14);
 
     select = (!select_p && select_c);
     set = (!set_p && set_c);
@@ -68,7 +77,7 @@ void readButtons()
 //This function is called during the RUN state.
 //Transition to SET_HOUR state when select button is pressed
 //ignore set button
-uint8_t checkSelectButton()
+uint8_t runState()
 {
     readButtons();
     
@@ -78,6 +87,10 @@ uint8_t checkSelectButton()
         stopTimer();
         resetSeconds();
         return SET_HOUR;
+    }
+    if(set)
+    {
+        bcd = !bcd;
     }
     return RUN;
 }
@@ -119,8 +132,8 @@ uint8_t setMinute()
     return SET_MINUTE;
 }
 
-//Display time on the first line of the LCD in HH:MM:SS format
-void dispTime()
+//Display time in pure binary format
+void dispBinaryTime()
 {
     copySeconds();
     uint8_t hours = getHour();
@@ -128,5 +141,58 @@ void dispTime()
     uint8_t secs = getSecond();
     
     //Print time in HH:MM:SS format
-    PORTB = secs;
+    PORTB = 0b00001;
+    PORTD = ~(hours << 1);
+    delay(1);
+
+    PORTB = 0b00100;
+    PORTD = ~(minutes << 1);
+    delay(1);
+
+    PORTB = 0b10000;
+    PORTD = ~(secs << 1);
+    delay(1);
+
+    if(!(secs % 2))
+    {
+        PORTB = 0b01010;
+        PORTD = 0b11010111;
+        delay(1);
+    }
 }
+
+//Display time in BCD format
+void dispBcdTime()
+{
+    copySeconds();
+    uint8_t hours = getHour();
+    uint8_t minutes = getMinute();
+    uint8_t secs = getSecond();
+
+    uint8_t timeArr[6];
+    timeArr[0] = hours / 10;
+    timeArr[1] = hours % 10;
+    timeArr[2] = minutes / 10;
+    timeArr[3] = minutes % 10;
+    timeArr[4] = secs / 10;
+    timeArr[5] = secs % 10;
+
+    uint8_t scanArr[6] =
+    {
+        0b10111111,
+        0b11011111,
+        0b11101111,
+        0b11110111,
+        0b11111011,
+        0b11111101
+    };
+
+    for(uint8_t i = 0; i < 6; i++)
+    {
+        PORTB = timeArr[i];
+        PORTD = scanArr[i];
+        delay(1);
+        
+    }
+}
+
