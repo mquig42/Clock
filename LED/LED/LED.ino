@@ -169,30 +169,28 @@ void dispBcdTime()
     uint8_t minutes = getMinute();
     uint8_t secs = getSecond();
 
-    uint8_t timeArr[6];
-    timeArr[0] = hours / 10;
-    timeArr[1] = hours % 10;
-    timeArr[2] = minutes / 10;
-    timeArr[3] = minutes % 10;
-    timeArr[4] = secs / 10;
-    timeArr[5] = secs % 10;
-
-    uint8_t scanArr[6] =
-    {
-        0b10111111,
-        0b11011111,
-        0b11101111,
-        0b11110111,
-        0b11111011,
-        0b11111101
-    };
-
-    for(uint8_t i = 0; i < 6; i++)
-    {
-        PORTB = timeArr[i];
-        PORTD = scanArr[i];
-        delay(1);
-        
-    }
+    PORTB = hours / 10;
+    PORTD = 0b10111111;
+    delay(1);
+    
+    PORTB = hours % 10;
+    PORTD = 0b11011111;
+    delay(1);
+    
+    PORTB = minutes / 10;
+    PORTD = 0b11101111;
+    delay(1);
+    
+    PORTB = minutes % 10;
+    PORTD = 0b11110111;
+    delay(1);
+    
+    PORTB = secs / 10;
+    PORTD = 0b11111011;
+    delay(1);
+    
+    PORTB = secs % 10;
+    PORTD = 0b11111101;
+    delay(1);
 }
 
