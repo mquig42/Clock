@@ -30,9 +30,8 @@ void setup()
     {
         pinMode(i, OUTPUT);
     }
-    pinMode(14, INPUT_PULLUP);
     pinMode(15, INPUT_PULLUP);
-    pinMode(16, INPUT_PULLUP);
+    pinMode(18, INPUT_PULLUP);
     configureTimer();
 }
 
@@ -65,7 +64,7 @@ void readButtons()
     static uint8_t select_p = false;
     static uint8_t set_p = false;
     uint8_t select_c = digitalRead(15);
-    uint8_t set_c = digitalRead(14);
+    uint8_t set_c = digitalRead(18);
 
     select = (!select_p && select_c);
     set = (!set_p && set_c);
