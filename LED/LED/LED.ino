@@ -140,7 +140,7 @@ void dispBinaryTime()
     uint8_t secs = getSecond();
     
     //Print time in HH:MM:SS format
-    PORTB = 0b00001;
+    PORTB = 0b00010;
     PORTD = ~(hours << 1);
     delay(1);
 
@@ -148,16 +148,9 @@ void dispBinaryTime()
     PORTD = ~(minutes << 1);
     delay(1);
 
-    PORTB = 0b10000;
+    PORTB = 0b01000;
     PORTD = ~(secs << 1);
     delay(1);
-
-    if(!(secs % 2))
-    {
-        PORTB = 0b01010;
-        PORTD = 0b11010111;
-        delay(1);
-    }
 }
 
 //Display time in BCD format
