@@ -8,8 +8,7 @@
  * board interferes and makes the lights dim, so values in port D must be
  * shifted accordingly.
  * 
- * Select and Set buttons are connected to analog pins 1 and 0,
- * aka digital pins 15 and 14, using internal pullup resistors.
+ * aka digital pins 15 and 18, using internal pullup resistors.
  * Pressing Set button when clock is running switches between binary
  * and BCD output modes.
  ******************************************************************************/
